@@ -1,2 +1,0 @@
-Just for project structure.
-Delete after files have been inserted 
