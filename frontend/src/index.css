@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: var(--bg);
+  --color-card: var(--card);
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
+  --color-primary-text: var(--text-primary);
+  --color-secondary-text: var(--text-secondary);
+}
+
+@layer base {
+  :root {
+    --bg: #0F172A;
+    --card: #1E293B;
+    --primary: #2563EB;
+    --secondary: #0F766E;
+    --accent: #64748B;
+    --text-primary: #E2E8F0;
+    --text-secondary: #94A3B8;
+  }
+
+  .theme-cyber-dark {
+    --bg: #0F172A;
+    --card: #1E293B;
+    --primary: #2563EB;
+    --secondary: #0F766E;
+    --accent: #64748B;
+    --text-primary: #E2E8F0;
+    --text-secondary: #94A3B8;
+  }
+
+  .theme-cyber-light {
+    --bg: #F8FAFC;
+    --card: #FFFFFF;
+    --primary: #2563EB;
+    --secondary: #0F766E;
+    --accent: #475569;
+    --text-primary: #0F172A;
+    --text-secondary: #475569;
+  }
+
+  .theme-stream-dark {
+    --bg: #111827;
+    --card: #1F2937;
+    --primary: #0EA5E9;
+    --secondary: #0284C7;
+    --accent: #64748B;
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+  }
+
+  .theme-stream-light {
+    --bg: #F3F4F6;
+    --card: #FFFFFF;
+    --primary: #0EA5E9;
+    --secondary: #0369A1;
+    --accent: #475569;
+    --text-primary: #1F2937;
+    --text-secondary: #6B7280;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text-primary);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
