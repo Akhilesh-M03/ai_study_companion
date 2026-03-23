@@ -69,4 +69,3 @@ def seed_users(test_db):
 
     db.close()
     return {"user1": user1, "user2": user2}
-

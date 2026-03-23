@@ -128,6 +128,7 @@ def test_generate_question_applies_recommendation_when_user_memory_exists(
 
     monkeypatch.setattr(chat_routes, "get_memories", fake_get_memories)
     monkeypatch.setattr(chat_routes, "recommend_topics", fake_recommend_topics)
+    monkeypatch.setattr(chat_routes, "get_user_topics", lambda _db, _uid: ([], []))
     monkeypatch.setattr(
         chat_routes, "generate_quiz_questions", fake_generate_quiz_questions
     )
@@ -196,6 +197,7 @@ def test_generate_question_uses_requested_topic_when_recommendations_disabled(
 
     monkeypatch.setattr(chat_routes, "get_memories", fake_get_memories)
     monkeypatch.setattr(chat_routes, "recommend_topics", fake_recommend_topics)
+    monkeypatch.setattr(chat_routes, "get_user_topics", lambda _db, _uid: ([], []))
     monkeypatch.setattr(
         chat_routes, "generate_quiz_questions", fake_generate_quiz_questions
     )
@@ -217,3 +219,75 @@ def test_generate_question_uses_requested_topic_when_recommendations_disabled(
     assert captured["difficulty"] == "hard"
     assert body["recommendation_applied"] is False
     assert body["recommendation_reason"] is None
+
+
+def test_generate_question_rejects_topic_not_in_uploaded_syllabus(client, monkeypatch):
+    """Generate question rejects topics outside the user's syllabus topic list."""
+
+    monkeypatch.setattr(
+        chat_routes,
+        "get_user_topics",
+        lambda _db, _uid: (["Linear Algebra", "Calculus"], ["Math"]),
+    )
+
+    response = client.post(
+        "/generate-question",
+        json={
+            "topic": "Trigonometry",
+            "difficulty": "medium",
+            "question_count": 2,
+            "user_id": "user1",
+            "use_recommendations": False,
+        },
+    )
+
+    assert response.status_code == 400
+    assert "uploaded syllabus" in response.json()["detail"]
+
+
+def test_generate_question_accepts_topic_in_uploaded_syllabus(client, monkeypatch):
+    """Generate question allows topics that exist in user's uploaded syllabus."""
+
+    monkeypatch.setattr(
+        chat_routes,
+        "get_user_topics",
+        lambda _db, _uid: (["Linear Algebra", "Calculus"], ["Math"]),
+    )
+
+    def fake_generate_quiz_questions(
+        topic: str, difficulty: str = "medium", count: int = 2
+    ):
+        return {
+            "questions": [
+                {
+                    "question": "Q1",
+                    "options": ["a", "b", "c", "d"],
+                    "correct_option_index": 0,
+                    "explanation": "E1",
+                },
+                {
+                    "question": "Q2",
+                    "options": ["a", "b", "c", "d"],
+                    "correct_option_index": 1,
+                    "explanation": "E2",
+                },
+            ]
+        }
+
+    monkeypatch.setattr(
+        chat_routes, "generate_quiz_questions", fake_generate_quiz_questions
+    )
+
+    response = client.post(
+        "/generate-question",
+        json={
+            "topic": "Calculus",
+            "difficulty": "medium",
+            "question_count": 2,
+            "user_id": "user1",
+            "use_recommendations": False,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["topic"] == "Calculus"

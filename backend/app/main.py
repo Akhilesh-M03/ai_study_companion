@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.auth_routes import router as auth_router
 from app.api.routes.chat_routes import router as chat_router
 from app.api.routes.memory_routes import router as memory_router
+from app.api.routes.syllabus_routes import router as syllabus_router
 from app.api.routes.system_routes import router as system_router
 from app.core.db_init import init_db
 
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(chat_router)
     app.include_router(memory_router)
+    app.include_router(syllabus_router)
     app.include_router(system_router)
 
     return app

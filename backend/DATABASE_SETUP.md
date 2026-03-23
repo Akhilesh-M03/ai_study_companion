@@ -5,6 +5,7 @@ This guide explains how to set up PostgreSQL for the AI Study Companion applicat
 ## Overview
 
 The application uses:
+
 - **PostgreSQL** for user authentication (username, email, hashed_password)
 - **Hindsight SDK** for quiz history and personalization (quiz attempts, scores, weak topics)
 - **Alembic** for database migrations
@@ -14,17 +15,20 @@ The application uses:
 ### 1. Install PostgreSQL
 
 **On Windows:**
+
 - Download from https://www.postgresql.org/download/windows/
 - Run installer with default settings
 - Note the password for the `postgres` user
 
 **On macOS:**
+
 ```bash
 brew install postgresql
 brew services start postgresql
 ```
 
 **On Linux (Ubuntu/Debian):**
+
 ```bash
 sudo apt-get install postgresql postgresql-contrib
 sudo systemctl start postgresql
@@ -62,6 +66,7 @@ DATABASE_URL=postgresql://study_user:your_secure_password@localhost:5432/ai_stud
 ```
 
 Or if using different host/port:
+
 ```bash
 DATABASE_URL=postgresql://study_user:your_secure_password@your_host:5432/ai_study_companion
 ```
@@ -116,21 +121,26 @@ python -m alembic current
 ## Troubleshooting
 
 ### Connection refused
+
 ```
 psycopg2.OperationalError: connection to server at "localhost" (127.0.0.1), port 5432 failed
 ```
+
 - Check PostgreSQL is running: `sudo systemctl status postgresql` (Linux) or look for `postgres.exe` (Windows)
 - Verify DATABASE_URL in `.env`
 - Check credentials
 
 ### Authentication failed
+
 ```
 psycopg2.OperationalError: FATAL: password authentication failed for user "study_user"
 ```
+
 - Verify password in DATABASE_URL matches what you set with `CREATE USER`
 - Password should be URL-encoded if it contains special characters
 
 ### "Role does not exist"
+
 - Run the CREATE USER command above
 - Ensure you created the user before databases
 

@@ -1,10 +1,11 @@
 """Initial schema with User table.
 
 Revision ID: 001_initial_schema
-Revises: 
+Revises:
 Create Date: 2026-03-23 00:00:00.000000
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op

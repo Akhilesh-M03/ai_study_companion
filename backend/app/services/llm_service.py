@@ -157,3 +157,83 @@ def generate_quiz_question(topic: str, difficulty: str = "medium") -> Dict[str, 
 
     result = generate_quiz_questions(topic=topic, difficulty=difficulty, count=1)
     return result["questions"][0]
+
+
+def extract_subject_topic_outline(text: str) -> Dict[str, Any]:
+    """Extract structured subject/topic outline from raw syllabus text."""
+
+    trimmed = (text or "").strip()
+    if not trimmed:
+        raise RuntimeError("Syllabus text is empty")
+
+    # Keep prompt size bounded for reliability and lower latency/cost.
+    if len(trimmed) > 12000:
+        trimmed = trimmed[:12000]
+
+    client = _get_client()
+    prompt = (
+        "Extract subjects and topics from the syllabus text. Return strict JSON only.\n"
+        "No markdown, no explanation.\n"
+        "Schema:\n"
+        '{"subjects":[{"name":"string","topics":["string"]}]}\n'
+        "Rules:\n"
+        "- subjects must be unique and concise\n"
+        "- topics should be specific and unique within each subject\n"
+        "- if only one broad subject is present, still return one subject object\n"
+        "- output JSON object only\n"
+        f"Syllabus text:\n{trimmed}"
+    )
+
+    try:
+        response = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            model=GROQ_MODEL_NAME,
+            temperature=0.1,
+            max_tokens=900,
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Groq API error while extracting syllabus: {exc}") from exc
+
+    raw = (response.choices[0].message.content or "").strip()
+    parsed = safe_parse_json(raw)
+    if not parsed:
+        raise RuntimeError("Failed to parse syllabus JSON from LLM response")
+
+    subjects = parsed.get("subjects")
+    if not isinstance(subjects, list) or not subjects:
+        raise RuntimeError("LLM response missing valid 'subjects' list")
+
+    normalized_subjects = []
+    for subject in subjects:
+        if not isinstance(subject, dict):
+            continue
+
+        name = (subject.get("name") or "").strip()
+        topics = subject.get("topics")
+        if not name or not isinstance(topics, list):
+            continue
+
+        clean_topics = []
+        seen = set()
+        for topic in topics:
+            if not isinstance(topic, str):
+                continue
+            clean = topic.strip()
+            if not clean:
+                continue
+            lower = clean.lower()
+            if lower in seen:
+                continue
+            seen.add(lower)
+            clean_topics.append(clean)
+
+        if clean_topics:
+            normalized_subjects.append({"name": name, "topics": clean_topics})
+
+    if not normalized_subjects:
+        raise RuntimeError("LLM response did not contain usable subjects/topics")
+
+    return {"subjects": normalized_subjects}

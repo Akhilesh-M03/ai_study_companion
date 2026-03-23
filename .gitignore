@@ -184,3 +184,6 @@ logs/
 tmp/
 temp/
 .tmp/
+
+#misc
+VIDEO_SCRIPT.md
