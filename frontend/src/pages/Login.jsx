@@ -6,21 +6,38 @@ import { useAppState } from "../context/AppStateContext";
 import aiVisual from "../assets/image (7).png";
 
 const Login = () => {
+  const MotionDiv = motion.div;
+  const MotionButton = motion.button;
   const navigate = useNavigate();
-  const { startSession } = useAppState();
+  const { loginWithCredentials } = useAppState();
   const formRef = useRef(null);
 
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleLogin = (event) => {
+  const handleLogin = async (event) => {
     event.preventDefault();
-    if (!email.trim() || !password.trim()) {
+    if (!username.trim() || !password.trim()) {
       return;
     }
 
-    startSession(email);
-    navigate("/dashboard");
+    setIsSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      await loginWithCredentials({ username, password });
+      navigate("/dashboard");
+    } catch (error) {
+      const message =
+        typeof error?.message === "string"
+          ? error.message
+          : "Unable to sign in right now.";
+      setErrorMessage(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handlePasswordEnter = (event) => {
@@ -34,7 +51,7 @@ const Login = () => {
     <div className="min-h-screen w-full bg-white text-slate-900">
       <div className="grid min-h-screen grid-cols-1 md:grid-cols-2">
         <section className="flex items-center justify-center bg-white px-6 py-10 md:px-10 lg:px-16">
-          <motion.div
+          <MotionDiv
             initial={{ opacity: 0, y: 26 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, ease: "easeOut" }}
@@ -60,17 +77,17 @@ const Login = () => {
             >
               <div>
                 <label
-                  htmlFor="email"
+                  htmlFor="username"
                   className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500"
                 >
-                  Email
+                  Username
                 </label>
                 <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="you@example.com"
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  placeholder="your_username"
                   className="w-full rounded-xl border border-slate-200 bg-white py-3 px-4 text-sm text-slate-800 outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                   required
                 />
@@ -95,15 +112,22 @@ const Login = () => {
                 />
               </div>
 
-              <motion.button
+              <MotionButton
                 whileHover={{ y: -1 }}
                 whileTap={{ scale: 0.99 }}
                 type="submit"
+                disabled={isSubmitting}
                 className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3.5 text-sm font-black text-white shadow-[var(--cta-glow)] transition-colors duration-200 hover:bg-emerald-600"
               >
-                Login
+                {isSubmitting ? "Signing in..." : "Login"}
                 <ArrowRight className="h-4 w-4" />
-              </motion.button>
+              </MotionButton>
+
+              {errorMessage ? (
+                <p className="text-xs font-semibold text-rose-600 text-center">
+                  {errorMessage}
+                </p>
+              ) : null}
 
               <button
                 type="button"
@@ -122,7 +146,7 @@ const Login = () => {
                 Register here
               </Link>
             </p>
-          </motion.div>
+          </MotionDiv>
         </section>
 
         <section className="relative hidden items-center justify-center overflow-hidden bg-gradient-to-br from-teal-50 via-white to-indigo-50 p-8 md:flex lg:p-12">

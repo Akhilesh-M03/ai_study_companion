@@ -10,6 +10,7 @@ from app.api.routes.chat_routes import router as chat_router
 from app.api.routes.memory_routes import router as memory_router
 from app.api.routes.syllabus_routes import router as syllabus_router
 from app.api.routes.system_routes import router as system_router
+from app.core.config import ALLOWED_CORS_ORIGINS
 from app.core.db_init import init_db
 
 
@@ -34,7 +35,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=ALLOWED_CORS_ORIGINS,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

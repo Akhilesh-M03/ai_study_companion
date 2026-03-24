@@ -46,6 +46,8 @@ const Dashboard = () => {
     averageScore,
     latestDelta,
     quizHistory,
+    serverRecommendations,
+    serverTotalRecords,
     topicPerformance,
     weakTopics,
     userName,
@@ -56,9 +58,12 @@ const Dashboard = () => {
   );
   const strongestImprovement = sortedImprovements.find((item) => item[1] > 0);
   const weakTopic = weakTopics[0]?.topic || "Trigonometry";
+  const topRecommendation = serverRecommendations[0];
   const improvementMessage = strongestImprovement
     ? `You improved in ${strongestImprovement[0]} (+${strongestImprovement[1]}%)`
-    : "You improved in Algebra (+15%)";
+    : topRecommendation
+      ? `Recommended next: ${topRecommendation.topic} (${topRecommendation.recommended_difficulty})`
+      : "Keep practicing to unlock stronger recommendations.";
 
   const progressData = buildProgressData(quizHistory);
 
@@ -91,17 +96,19 @@ const Dashboard = () => {
     {
       id: "quizzes",
       label: "Quizzes Logged",
-      value: quizHistory.length || 12,
-      hint: "Last 30 days",
+      value: serverTotalRecords || quizHistory.length || 12,
+      hint: serverTotalRecords ? "Synced from memory" : "Last 30 days",
       icon: <Activity className="w-4 h-4" />,
     },
     {
-      id: "best-gain",
-      label: "Best Gain",
-      value: strongestImprovement ? `+${strongestImprovement[1]}%` : "+15%",
-      hint: strongestImprovement
-        ? `In ${strongestImprovement[0]}`
-        : "In Algebra",
+      id: "next-focus",
+      label: "Next Focus",
+      value: topRecommendation?.topic || "In progress",
+      hint: topRecommendation
+        ? topRecommendation.reason
+        : strongestImprovement
+          ? `Improvement in ${strongestImprovement[0]}`
+          : "Recommendations appear after more attempts",
       icon: <TrendingUp className="w-4 h-4" />,
     },
   ];

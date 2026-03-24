@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   CheckCircle2,
@@ -9,113 +9,60 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useAppState } from "../context/AppStateContext";
+import { generateQuizQuestions } from "../services/quizApi";
+import { storeMemoryBatch } from "../services/memoryApi";
 
-const dummyQuestions = [
-  {
-    id: "q-oose-1",
-    subject: "Software Engineering",
-    topic: "OOSE",
-    difficulty: "Medium",
-    prompt:
-      "Which UML diagram is best for showing object interactions over time in a use case?",
-    options: [
-      "Class Diagram",
-      "Sequence Diagram",
-      "State Diagram",
-      "Deployment Diagram",
-    ],
-    correctIndex: 1,
-    hint: "Think of time-ordered message flow between objects.",
-    explanation:
-      "A Sequence Diagram models interactions between objects in chronological order.",
-    mistakeType: "Model selection confusion",
-    suggestion:
-      "Map each UML diagram to its purpose before solving scenario-based questions.",
-  },
-  {
-    id: "q-ml-1",
-    subject: "Artificial Intelligence",
-    topic: "Machine Learning",
-    difficulty: "Easy",
-    prompt: "Why do we split data into training and test sets?",
-    options: [
-      "To reduce file size",
-      "To evaluate generalization on unseen data",
-      "To speed up GPU inference",
-      "To avoid feature scaling",
-    ],
-    correctIndex: 1,
-    hint: "The goal is to check performance on data the model did not see while training.",
-    explanation:
-      "A held-out test set estimates how well a model generalizes to unseen examples.",
-    mistakeType: "Evaluation concept gap",
-    suggestion:
-      "Remember: training learns, validation tunes, test verifies generalization.",
-  },
-  {
-    id: "q-ml-2",
-    subject: "Artificial Intelligence",
-    topic: "Machine Learning",
-    difficulty: "Hard",
-    prompt:
-      "Which technique is most directly used to reduce overfitting in a neural network?",
-    options: [
-      "Increasing training epochs only",
-      "Removing normalization",
-      "Dropout regularization",
-      "Using larger batch size only",
-    ],
-    correctIndex: 2,
-    hint: "It randomly drops neurons during training.",
-    explanation:
-      "Dropout acts as regularization by preventing co-adaptation of neurons.",
-    mistakeType: "Regularization strategy mismatch",
-    suggestion:
-      "Link each overfitting symptom to a concrete regularization method.",
-  },
+const topicFallback = ["Algorithms", "Data Structures", "Databases"];
+const difficultyOptions = [
+  { label: "Easy", value: "easy" },
+  { label: "Medium", value: "medium" },
+  { label: "Hard", value: "hard" },
 ];
 
-const topicOptions = ["All", "OOSE", "Machine Learning"];
-const getAutoTopic = (weakTopics) => {
-  const hasMathOrCSWeakness = weakTopics.some(
-    (item) => item.subject === "Math" || item.subject === "CS",
-  );
-  return hasMathOrCSWeakness ? "Machine Learning" : "OOSE";
+const toDisplayDifficulty = (value) => {
+  if (!value) {
+    return "Medium";
+  }
+
+  return `${value.charAt(0).toUpperCase()}${value.slice(1).toLowerCase()}`;
 };
 
-const buildOrderedQuestions = (selectedTopic, selectedDifficulty) => {
-  return [...dummyQuestions].sort((a, b) => {
-    const scoreA =
-      (selectedTopic !== "All" && a.topic === selectedTopic ? 2 : 0) +
-      (selectedDifficulty !== "All" && a.difficulty === selectedDifficulty
-        ? 1
-        : 0);
-    const scoreB =
-      (selectedTopic !== "All" && b.topic === selectedTopic ? 2 : 0) +
-      (selectedDifficulty !== "All" && b.difficulty === selectedDifficulty
-        ? 1
-        : 0);
-    return scoreB - scoreA;
-  });
+const getAutoTopic = (weakTopics) => {
+  return weakTopics[0]?.topic || topicFallback[0];
 };
 
 const Quiz = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { weakTopics, recordQuizResult } = useAppState();
+  const {
+    authToken,
+    recordQuizResult,
+    refreshLearningInsights,
+    serverSyllabusTopics,
+    topicPerformance,
+    userName,
+    weakTopics,
+  } = useAppState();
+
+  const topicOptions = useMemo(() => {
+    const dedupedTopics = [
+      ...new Set(topicPerformance.map((item) => item.topic)),
+    ];
+    const merged = [
+      ...serverSyllabusTopics,
+      ...dedupedTopics,
+      ...topicFallback,
+    ].filter(Boolean);
+    return [...new Set(merged)];
+  }, [serverSyllabusTopics, topicPerformance]);
 
   const autoStart = Boolean(location.state?.autoWeak);
-  const initialTopic = autoStart ? getAutoTopic(weakTopics) : "All";
-  const initialDifficulty = autoStart ? "Medium" : "All";
-  const initialQuestions = autoStart
-    ? buildOrderedQuestions(initialTopic, initialDifficulty)
-    : [];
+  const initialTopic = getAutoTopic(weakTopics);
 
-  const [phase, setPhase] = useState(autoStart ? "question" : "setup");
+  const [phase, setPhase] = useState("setup");
   const [selectedTopic, setSelectedTopic] = useState(initialTopic);
-  const [selectedDifficulty, setSelectedDifficulty] =
-    useState(initialDifficulty);
-  const [quizQuestions, setQuizQuestions] = useState(initialQuestions);
+  const [selectedDifficulty, setSelectedDifficulty] = useState("medium");
+  const [quizQuestions, setQuizQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState(null);
   const [showHint, setShowHint] = useState(false);
@@ -125,6 +72,16 @@ const Quiz = () => {
   const [attempts, setAttempts] = useState([]);
   const [feedback, setFeedback] = useState(null);
   const [summary, setSummary] = useState(null);
+  const [setupError, setSetupError] = useState("");
+  const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
+  const [isSavingMemory, setIsSavingMemory] = useState(false);
+
+  useEffect(() => {
+    if (autoStart) {
+      startQuiz(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart]);
 
   const currentQuestion = quizQuestions[currentIndex];
 
@@ -142,22 +99,61 @@ const Quiz = () => {
   const ghostButton =
     "rounded-xl border border-slate-200 bg-slate-50 hover:bg-white px-5 py-3 font-semibold text-slate-800 transition-colors";
 
-  const startQuiz = (isAuto) => {
+  const startQuiz = async (isAuto) => {
     const topic = isAuto ? getAutoTopic(weakTopics) : selectedTopic;
-    const difficulty = isAuto ? "Medium" : selectedDifficulty;
-    const ordered = buildOrderedQuestions(topic, difficulty);
+    const difficulty = isAuto ? "medium" : selectedDifficulty;
 
-    setSelectedTopic(topic);
-    setSelectedDifficulty(difficulty);
-    setQuizQuestions(ordered);
-    setCurrentIndex(0);
-    setSelectedOption(null);
-    setShowHint(false);
-    setAttempts([]);
-    setFeedback(null);
-    setSummary(null);
-    setSourceLabel(isAuto ? "Practice Weak Topics" : "Manual Quiz");
-    setPhase("question");
+    setIsGeneratingQuiz(true);
+    setSetupError("");
+
+    try {
+      const response = await generateQuizQuestions({
+        topic,
+        difficulty,
+        userId: userName,
+        useRecommendations: true,
+      });
+
+      const resolvedTopic = response?.topic || topic;
+      const resolvedDifficulty = response?.difficulty || difficulty;
+      const mappedQuestions = (response?.questions || []).map(
+        (item, index) => ({
+          id: `${Date.now()}-${index}`,
+          subject: "Generated",
+          topic: resolvedTopic,
+          difficulty: toDisplayDifficulty(resolvedDifficulty),
+          prompt: item.question,
+          options: item.options,
+          correctIndex: item.correct_option_index,
+          hint: "Use elimination and focus on the key concept in the prompt.",
+          explanation: item.explanation,
+          mistakeType: "Conceptual",
+          suggestion:
+            "Review the explanation and test your understanding with one follow-up question.",
+        }),
+      );
+
+      setSelectedTopic(resolvedTopic);
+      setSelectedDifficulty(resolvedDifficulty);
+      setQuizQuestions(mappedQuestions);
+      setCurrentIndex(0);
+      setSelectedOption(null);
+      setShowHint(false);
+      setAttempts([]);
+      setFeedback(null);
+      setSummary(null);
+      setSourceLabel(isAuto ? "Practice Weak Topics" : "Manual Quiz");
+      setPhase("question");
+    } catch (error) {
+      const message =
+        typeof error?.message === "string"
+          ? error.message
+          : "Failed to generate quiz questions.";
+      setSetupError(message);
+      setPhase("setup");
+    } finally {
+      setIsGeneratingQuiz(false);
+    }
   };
 
   const submitAnswer = () => {
@@ -171,6 +167,10 @@ const Quiz = () => {
       topic: currentQuestion.topic,
       subject: currentQuestion.subject,
       isCorrect,
+      selectedAnswer: currentQuestion.options[selectedOption] || "",
+      correctAnswer:
+        currentQuestion.options[currentQuestion.correctIndex] || "",
+      difficulty: currentQuestion.difficulty,
     };
 
     setAttempts((prev) => [...prev, nextAttempt]);
@@ -196,7 +196,7 @@ const Quiz = () => {
     navigate("/chat", { state: { seedPrompt: prompt } });
   };
 
-  const nextQuestion = () => {
+  const nextQuestion = async () => {
     const isLast = currentIndex === quizQuestions.length - 1;
 
     if (!isLast) {
@@ -219,9 +219,36 @@ const Quiz = () => {
 
     recordQuizResult({
       results: attempts,
-      difficulty: selectedDifficulty === "All" ? "Medium" : selectedDifficulty,
+      difficulty: toDisplayDifficulty(selectedDifficulty),
       source: sourceLabel,
     });
+
+    setIsSavingMemory(true);
+    try {
+      await storeMemoryBatch({
+        userId: userName,
+        token: authToken,
+        attempts: attempts.map((item) => ({
+          topic: item.topic,
+          mistake_type: item.isCorrect ? "Careless" : "Conceptual",
+          difficulty: toDisplayDifficulty(selectedDifficulty),
+          score: item.isCorrect ? 100 : 0,
+          question_id: item.questionId,
+          source: "quiz",
+          user_answer: item.selectedAnswer,
+          correct_answer: item.correctAnswer,
+        })),
+      });
+      await refreshLearningInsights(userName, authToken);
+    } catch (error) {
+      setSetupError(
+        typeof error?.message === "string"
+          ? `Quiz saved locally, but memory sync failed: ${error.message}`
+          : "Quiz saved locally, but memory sync failed.",
+      );
+    } finally {
+      setIsSavingMemory(false);
+    }
 
     setSummary({ score, correct, total, weakFromQuiz });
     setPhase("summary");
@@ -259,17 +286,42 @@ const Quiz = () => {
                   ))}
                 </select>
               </div>
+
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Difficulty
+                </label>
+                <select
+                  value={selectedDifficulty}
+                  onChange={(e) => setSelectedDifficulty(e.target.value)}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  {difficultyOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
+
+            {setupError ? (
+              <p className="text-sm font-semibold text-rose-600 mt-4">
+                {setupError}
+              </p>
+            ) : null}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-7">
               <button
                 onClick={() => startQuiz(false)}
+                disabled={isGeneratingQuiz}
                 className={primaryButton}
               >
-                Start Quiz
+                {isGeneratingQuiz ? "Generating..." : "Start Quiz"}
               </button>
               <button
                 onClick={() => startQuiz(true)}
+                disabled={isGeneratingQuiz}
                 className="rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 px-5 py-3 font-semibold hover:bg-white transition-colors flex items-center justify-center gap-2"
               >
                 <Sparkles className="w-4 h-4" />
@@ -325,9 +377,10 @@ const Quiz = () => {
 
           <button
             onClick={() => navigate("/dashboard")}
-            className={`${primaryButton} mt-4`}
+            disabled={isSavingMemory}
+            className={`${primaryButton} mt-4 disabled:opacity-60`}
           >
-            Back to Dashboard
+            {isSavingMemory ? "Syncing memory..." : "Back to Dashboard"}
           </button>
         </div>
       </section>
@@ -425,6 +478,7 @@ const Quiz = () => {
                 </button>
                 <button
                   onClick={() => startQuiz(true)}
+                  disabled={isGeneratingQuiz}
                   className="rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 px-5 py-3 font-semibold hover:bg-white transition-colors flex items-center gap-2"
                 >
                   <Sparkles className="w-4 h-4" />

@@ -1,8 +1,22 @@
 """User authentication service using SQLAlchemy."""
 
+import secrets
+
 from sqlalchemy.orm import Session
-from app.models import User
+
 from app.core.security import hash_password, verify_password
+from app.models import User
+
+
+def _generate_student_id(db: Session) -> str:
+    """Generate a non-sequential, human-readable student id."""
+
+    while True:
+        # 8 hex chars gives high enough entropy and stays readable.
+        candidate = f"STU-{secrets.token_hex(4).upper()}"
+        exists = db.query(User).filter(User.student_id == candidate).first()
+        if not exists:
+            return candidate
 
 
 def get_user_by_username(db: Session, username: str) -> User | None:
@@ -34,8 +48,21 @@ def create_user(
         full_name=username.title(),
         hashed_password=hashed_password,
         disabled=False,
+        student_id=_generate_student_id(db),
     )
     db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def ensure_user_student_id(db: Session, user: User) -> User:
+    """Backfill a non-sequential student id for existing users if missing."""
+
+    if user.student_id:
+        return user
+
+    user.student_id = _generate_student_id(db)
     db.commit()
     db.refresh(user)
     return user

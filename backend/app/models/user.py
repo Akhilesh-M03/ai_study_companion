@@ -19,6 +19,12 @@ class User(Base):
     full_name = Column(String, nullable=True)
     hashed_password = Column(String, nullable=False)
     disabled = Column(Boolean, default=False)
+    student_id = Column(String, unique=True, index=True, nullable=True)
+    daily_study_hours = Column(Integer, default=1, nullable=False)
+    dsa_problems_per_day = Column(Integer, default=5, nullable=False)
+    revision_minutes_per_day = Column(Integer, default=30, nullable=False)
+    weekly_streak = Column(Integer, default=0, nullable=False)
+    quizzes_completed = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime,
@@ -36,5 +42,11 @@ class User(Base):
             "full_name": self.full_name,
             "hashed_password": self.hashed_password,
             "disabled": self.disabled,
+            "student_id": self.student_id,
+            "daily_study_hours": self.daily_study_hours,
+            "dsa_problems_per_day": self.dsa_problems_per_day,
+            "revision_minutes_per_day": self.revision_minutes_per_day,
+            "weekly_streak": self.weekly_streak,
+            "quizzes_completed": self.quizzes_completed,
             "created_at": self.created_at,
         }

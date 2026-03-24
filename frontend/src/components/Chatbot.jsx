@@ -76,6 +76,7 @@ const renderMessageBody = (text) => {
 };
 
 export default function Chatbot() {
+  const MotionArticle = motion.article;
   const navigate = useNavigate();
   const location = useLocation();
   const seedPrompt = (location.state?.seedPrompt || "").trim();
@@ -147,7 +148,7 @@ export default function Chatbot() {
       <div className="h-[56vh] overflow-y-auto p-5 md:p-6 space-y-4 bg-gradient-to-b from-transparent via-background/40 to-background/60">
         <AnimatePresence initial={false}>
           {messages.map((message) => (
-            <motion.article
+            <MotionArticle
               key={message.id}
               initial={{ opacity: 0, y: 10, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -189,7 +190,7 @@ export default function Chatbot() {
                   </div>
                 ) : null}
               </div>
-            </motion.article>
+            </MotionArticle>
           ))}
         </AnimatePresence>
       </div>

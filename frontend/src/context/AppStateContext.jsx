@@ -1,5 +1,30 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, {
+  useCallback,
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  clearStoredAccessToken,
+  fetchUserProfile,
+  getStoredAccessToken,
+  loginUser,
+  signupUser,
+  storeAccessToken,
+} from "../services/authApi";
+import {
+  fetchInsights,
+  fetchMistakes,
+  fetchRecommendations,
+  fetchWeakTopics,
+} from "../services/memoryApi";
+import {
+  fetchSyllabusTopics,
+  uploadSyllabusFile,
+} from "../services/syllabusApi";
 
 const AppStateContext = createContext();
 
@@ -55,6 +80,41 @@ const initialQuizHistory = [
 ];
 
 const clampStrength = (value) => Math.max(5, Math.min(98, value));
+
+const mergeTopicSignals = (currentTopics, weakTopicNames, strongTopicNames) => {
+  const weakSet = new Set(weakTopicNames);
+  const strongSet = new Set(strongTopicNames);
+  const knownTopics = new Set(currentTopics.map((item) => item.topic));
+
+  const adjusted = currentTopics.map((topic) => {
+    if (weakSet.has(topic.topic)) {
+      return { ...topic, strength: Math.min(topic.strength, 35) };
+    }
+
+    if (strongSet.has(topic.topic)) {
+      return { ...topic, strength: Math.max(topic.strength, 75) };
+    }
+
+    return topic;
+  });
+
+  const appended = [];
+  weakTopicNames.forEach((topic) => {
+    if (!knownTopics.has(topic)) {
+      appended.push({ subject: "General", topic, strength: 30 });
+      knownTopics.add(topic);
+    }
+  });
+
+  strongTopicNames.forEach((topic) => {
+    if (!knownTopics.has(topic)) {
+      appended.push({ subject: "General", topic, strength: 80 });
+      knownTopics.add(topic);
+    }
+  });
+
+  return [...adjusted, ...appended];
+};
 
 const defaultOnboardingPreferences = {
   avatar: "robot",
@@ -119,13 +179,27 @@ export const useAppState = () => {
 
 export const AppStateProvider = ({ children }) => {
   const [userName, setUserName] = useState("");
+  const [userProfile, setUserProfile] = useState(null);
+  const [authToken, setAuthToken] = useState(getStoredAccessToken);
+  const [authReady, setAuthReady] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [authError, setAuthError] = useState("");
   const [onboardingPreferences, setOnboardingPreferences] = useState(
     defaultOnboardingPreferences,
   );
   const [topicPerformance, setTopicPerformance] = useState(
     initialTopicPerformance,
   );
+  const [serverWeakTopicNames, setServerWeakTopicNames] = useState([]);
+  const [serverStrongTopicNames, setServerStrongTopicNames] = useState([]);
+  const [serverMostCommonMistakeType, setServerMostCommonMistakeType] =
+    useState(null);
+  const [serverRecommendations, setServerRecommendations] = useState([]);
+  const [serverMistakes, setServerMistakes] = useState([]);
+  const [serverTotalRecords, setServerTotalRecords] = useState(0);
+  const [serverSyllabusTopics, setServerSyllabusTopics] = useState([]);
+  const [serverSyllabusSubjects, setServerSyllabusSubjects] = useState([]);
+  const [hasUploadedSyllabus, setHasUploadedSyllabus] = useState(false);
   const [quizHistory, setQuizHistory] = useState(initialQuizHistory);
   const [latestDelta, setLatestDelta] = useState({});
   const [pendingChatPrompt, setPendingChatPrompt] = useState("");
@@ -169,6 +243,192 @@ export const AppStateProvider = ({ children }) => {
     ];
   }, [latestDelta, weakTopics]);
 
+  const refreshLearningInsights = useCallback(
+    async (userId = userName, token = authToken) => {
+      const resolvedUserId = (userId || "").trim();
+      if (!resolvedUserId || !token) {
+        return;
+      }
+
+      try {
+        const [weakTopicData, insightsData, mistakesData, recommendationsData] =
+          await Promise.all([
+            fetchWeakTopics(resolvedUserId, token),
+            fetchInsights(resolvedUserId, token),
+            fetchMistakes(resolvedUserId, token),
+            fetchRecommendations(resolvedUserId, token),
+          ]);
+
+        const weakNames = Array.isArray(weakTopicData?.weak_topics)
+          ? weakTopicData.weak_topics
+          : [];
+        const strongNames = Array.isArray(insightsData?.insights?.strong_topics)
+          ? insightsData.insights.strong_topics
+          : [];
+        const mostCommonMistakeType =
+          insightsData?.insights?.most_common_mistake_type || null;
+        const recommendations = Array.isArray(
+          recommendationsData?.recommendations,
+        )
+          ? recommendationsData.recommendations
+          : [];
+        const mistakes = Array.isArray(mistakesData?.mistakes)
+          ? mistakesData.mistakes
+          : [];
+        const totalRecords = Number.isFinite(insightsData?.total_records)
+          ? insightsData.total_records
+          : mistakes.length;
+
+        setServerWeakTopicNames(weakNames);
+        setServerStrongTopicNames(strongNames);
+        setServerMostCommonMistakeType(mostCommonMistakeType);
+        setServerRecommendations(recommendations);
+        setServerMistakes(mistakes);
+        setServerTotalRecords(totalRecords);
+        setTopicPerformance((prev) =>
+          mergeTopicSignals(prev, weakNames, strongNames),
+        );
+      } catch {
+        // Keep local fallback state when memory API is unavailable.
+      }
+    },
+    [authToken, userName],
+  );
+
+  const refreshSyllabusTopics = useCallback(
+    async (userId = userName, token = authToken) => {
+      const resolvedUserId = (userId || "").trim();
+      if (!resolvedUserId || !token) {
+        return;
+      }
+
+      try {
+        const response = await fetchSyllabusTopics(resolvedUserId, token);
+        setHasUploadedSyllabus(Boolean(response?.has_syllabus));
+        setServerSyllabusTopics(
+          Array.isArray(response?.topics) ? response.topics : [],
+        );
+        setServerSyllabusSubjects(
+          Array.isArray(response?.subjects) ? response.subjects : [],
+        );
+      } catch {
+        // Keep existing topics if syllabus service is unavailable.
+      }
+    },
+    [authToken, userName],
+  );
+
+  const refreshUserProfile = useCallback(
+    async (token = authToken) => {
+      if (!token) {
+        return null;
+      }
+
+      const profile = await fetchUserProfile(token);
+      setUserName(profile?.username || "Learner");
+      setUserProfile(profile || null);
+      return profile;
+    },
+    [authToken],
+  );
+
+  const uploadAndRefreshSyllabus = useCallback(
+    async (file) => {
+      if (!authToken || !userName) {
+        throw new Error("Sign in before uploading a syllabus.");
+      }
+
+      await uploadSyllabusFile({ userId: userName, token: authToken, file });
+      await refreshSyllabusTopics(userName, authToken);
+    },
+    [authToken, refreshSyllabusTopics, userName],
+  );
+
+  useEffect(() => {
+    let isActive = true;
+
+    const bootstrapSession = async () => {
+      if (!authToken) {
+        if (isActive) {
+          setAuthReady(true);
+        }
+        return;
+      }
+
+      try {
+        const profile = await refreshUserProfile(authToken);
+        if (isActive) {
+          setAuthError("");
+          await refreshLearningInsights(profile?.username || "", authToken);
+          await refreshSyllabusTopics(profile?.username || "", authToken);
+        }
+      } catch {
+        clearStoredAccessToken();
+        if (isActive) {
+          setAuthToken("");
+          setUserName("");
+        }
+      } finally {
+        if (isActive) {
+          setAuthReady(true);
+        }
+      }
+    };
+
+    bootstrapSession();
+
+    return () => {
+      isActive = false;
+    };
+  }, [
+    authToken,
+    refreshLearningInsights,
+    refreshSyllabusTopics,
+    refreshUserProfile,
+  ]);
+
+  useEffect(() => {
+    if (!userName || !authToken) {
+      setServerWeakTopicNames([]);
+      setServerStrongTopicNames([]);
+      setServerMostCommonMistakeType(null);
+      setServerRecommendations([]);
+      setServerMistakes([]);
+      setServerTotalRecords(0);
+      setServerSyllabusTopics([]);
+      setServerSyllabusSubjects([]);
+      setHasUploadedSyllabus(false);
+      return;
+    }
+
+    refreshLearningInsights(userName, authToken);
+    refreshSyllabusTopics(userName, authToken);
+  }, [authToken, refreshLearningInsights, refreshSyllabusTopics, userName]);
+
+  const loginWithCredentials = async ({ username, password }) => {
+    const normalizedUsername = username.trim();
+    const response = await loginUser({
+      username: normalizedUsername,
+      password,
+    });
+    storeAccessToken(response.access_token);
+    setAuthToken(response.access_token);
+
+    const profile = await refreshUserProfile(response.access_token);
+    const resolvedUserName =
+      profile?.username || normalizedUsername || "Learner";
+    setUserName(resolvedUserName);
+    setAuthError("");
+    setIsOnboardingOpen(!hasCompletedOnboarding(resolvedUserName));
+    return profile;
+  };
+
+  const registerAndLogin = async ({ username, email, password }) => {
+    await signupUser({ username: username.trim(), email, password });
+    await loginWithCredentials({ username, password });
+    setIsOnboardingOpen(true);
+  };
+
   const startSession = (name, options = {}) => {
     const trimmed = name.trim();
     const showOnboarding =
@@ -188,10 +448,14 @@ export const AppStateProvider = ({ children }) => {
   };
 
   const logout = () => {
+    clearStoredAccessToken();
+    setAuthToken("");
     setUserName("");
+    setUserProfile(null);
     setPendingChatPrompt("");
     setIsOnboardingOpen(false);
     setOnboardingPreferences(defaultOnboardingPreferences);
+    setAuthError("");
   };
 
   const recordQuizResult = ({
@@ -261,21 +525,40 @@ export const AppStateProvider = ({ children }) => {
     <AppStateContext.Provider
       value={{
         averageScore,
+        authError,
+        authReady,
+        authToken,
         completeOnboarding,
         consumePendingChatPrompt,
+        hasUploadedSyllabus,
         insightMessages,
         isOnboardingOpen,
         latestDelta,
+        loginWithCredentials,
         logout,
         onboardingPreferences,
         pendingChatPrompt,
         queueChatPrompt,
         quizHistory,
         recordQuizResult,
+        refreshLearningInsights,
+        refreshUserProfile,
+        refreshSyllabusTopics,
+        registerAndLogin,
+        serverMistakes,
+        serverMostCommonMistakeType,
+        serverRecommendations,
+        serverStrongTopicNames,
+        serverSyllabusSubjects,
+        serverSyllabusTopics,
+        serverTotalRecords,
+        serverWeakTopicNames,
         setIsOnboardingOpen,
         startSession,
         strongTopics,
         topicPerformance,
+        uploadAndRefreshSyllabus,
+        userProfile,
         userName,
         weakTopics,
       }}

@@ -9,7 +9,7 @@ class BatchMemoryItem(BaseModel):
     """Single quiz attempt record for batch memory storage."""
 
     topic: str = Field(min_length=1)
-    mistake_type: Literal["Conceptual", "Calculation", "Careless"]
+    mistake_type: Literal["Correct", "Conceptual", "Calculation", "Careless"]
     difficulty: Literal["Easy", "Medium", "Hard"]
     score: int = Field(ge=0, le=100)
     question_id: Optional[str] = None
@@ -27,7 +27,7 @@ class StoreMemoryRequest(BaseModel):
 
     user_id: str = Field(min_length=1)
     topic: str = Field(min_length=1)
-    mistake_type: Literal["Conceptual", "Calculation", "Careless"]
+    mistake_type: Literal["Correct", "Conceptual", "Calculation", "Careless"]
     difficulty: Literal["Easy", "Medium", "Hard"]
     score: int = Field(ge=0, le=100)
     question_id: Optional[str] = None

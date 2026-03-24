@@ -24,7 +24,10 @@ async def chat_with_ai(chat_request: ChatRequest):
         )
 
     try:
-        reply = ask_llm(chat_request.message.strip())
+        reply = ask_llm(
+            chat_request.message.strip(),
+            history=chat_request.history,
+        )
         return {"reply": reply}
     except Exception:
         raise HTTPException(

@@ -2,7 +2,7 @@
 
 import json
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Sequence
 
 from groq import Groq
 
@@ -12,6 +12,8 @@ SYSTEM_PROMPT = (
     "You are an AI Study Companion that generates quiz questions and explains "
     "answers simply."
 )
+
+CHAT_HISTORY_LIMIT = 8
 
 
 def _get_client() -> Groq:
@@ -52,19 +54,58 @@ def safe_parse_json(raw_text: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def ask_llm(prompt: str) -> str:
+def _strip_think_sections(text: str) -> str:
+    """Remove hidden model reasoning blocks if present."""
+
+    return re.sub(r"<think\\b[^>]*>[\\s\\S]*?</think>", "", text, flags=re.IGNORECASE)
+
+
+def _build_chat_messages(
+    prompt: str,
+    history: Optional[Sequence[Any]] = None,
+) -> list[dict[str, str]]:
+    """Build a bounded chat payload with validated prior turns."""
+
+    messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    if history:
+        cleaned_history = []
+        for item in history[-CHAT_HISTORY_LIMIT:]:
+            if isinstance(item, dict):
+                role = item.get("role")
+                content = item.get("content")
+            else:
+                role = getattr(item, "role", None)
+                content = getattr(item, "content", None)
+            if role not in {"user", "assistant"}:
+                continue
+            if not isinstance(content, str):
+                continue
+            normalized = content.strip()
+            if not normalized:
+                continue
+            if role == "assistant":
+                normalized = _strip_think_sections(normalized).strip()
+                if not normalized:
+                    continue
+            cleaned_history.append({"role": role, "content": normalized})
+
+        messages.extend(cleaned_history)
+
+    messages.append({"role": "user", "content": prompt})
+    return messages
+
+
+def ask_llm(prompt: str, history: Optional[Sequence[Any]] = None) -> str:
     """Send a plain chat prompt to the model and return text output."""
 
     client = _get_client()
     response = client.chat.completions.create(
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ],
+        messages=_build_chat_messages(prompt=prompt, history=history),
         model=GROQ_MODEL_NAME,
         temperature=0.3,
     )
-    return (response.choices[0].message.content or "").strip()
+    return _strip_think_sections(response.choices[0].message.content or "").strip()
 
 
 def _validate_quiz_question_payload(question_data: Dict[str, Any]) -> Dict[str, Any]:

@@ -44,6 +44,22 @@ uvicorn app.main:app --reload
 
 The API will be available at `http://localhost:8000`
 
+## Environment Configuration
+
+Create your environment file from template:
+
+```bash
+copy .env.example .env
+```
+
+Key variables:
+
+- `SECRET_KEY` - required in production; set a strong random value
+- `DATABASE_URL` - PostgreSQL connection string
+- `ALLOWED_CORS_ORIGINS` - comma-separated frontend origins, e.g. `http://localhost:5173,https://yourapp.com`
+- `GROQ_API_KEY` - required for AI chat/quiz generation
+- `HINDSIGHT_API_KEY` - required for memory persistence and recommendations
+
 ## Running Unit Tests
 
 From the repository root:
@@ -116,11 +132,13 @@ Response:
 
 **POST** `/login`
 
-Request (form-data):
+Request (JSON):
 
-```
-username: user1
-password: password123
+```json
+{
+  "username": "user1",
+  "password": "password123"
+}
 ```
 
 Response:
@@ -199,7 +217,8 @@ Response:
 │   │   └── routes/
 │   │       ├── auth_routes.py   # /login, /signup, /protected, /user/profile
 │   │       ├── chat_routes.py   # /chat, /generate-question
-│   │       ├── memory_routes.py # /store-memory*, /weak-topics, /mistakes, /insights
+│   │       ├── memory_routes.py # /store-memory*, /weak-topics, /mistakes, /insights (JWT-protected)
+│   │       ├── syllabus_routes.py # /syllabus/upload, /syllabus/{user_id}* (JWT-protected)
 │   │       └── system_routes.py # /
 │   ├── core/
 │   │   ├── config.py            # Env/config constants
@@ -259,8 +278,8 @@ curl -X POST "http://localhost:8000/signup" \
 
 ```bash
 curl -X POST "http://localhost:8000/login" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=user1&password=password123"
+  -H "Content-Type: application/json" \
+  -d '{"username":"user1","password":"password123"}'
 ```
 
 ### Access Protected Route:

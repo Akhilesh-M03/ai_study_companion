@@ -1,7 +1,9 @@
 """Memory storage and learning insight routes."""
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.api.deps import get_current_user
+from app.schemas.auth import TokenData
 from app.schemas.memory import StoreMemoryBatchRequest, StoreMemoryRequest
 from app.services.memory_service import (
     calculate_insights,
@@ -14,15 +16,36 @@ from app.services.memory_service import (
 router = APIRouter()
 
 
+def _validate_user_scope(requested_user_id: str, current_user: TokenData) -> str:
+    clean_user_id = requested_user_id.strip()
+    if not clean_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="user_id cannot be empty",
+        )
+
+    if current_user.username != clean_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to access data for this user_id",
+        )
+
+    return clean_user_id
+
+
 @router.post("/store-memory-batch", response_model=dict)
-async def store_memory_batch(payload: StoreMemoryBatchRequest):
+async def store_memory_batch(
+    payload: StoreMemoryBatchRequest,
+    current_user: TokenData = Depends(get_current_user),
+):
     """Store exactly two quiz attempts in memory."""
 
+    clean_user_id = _validate_user_scope(payload.user_id, current_user)
     stored_count = 0
     for attempt in payload.attempts:
         success = await store_memory(
             {
-                "user_id": payload.user_id.strip(),
+                "user_id": clean_user_id,
                 "topic": attempt.topic,
                 "mistake_type": attempt.mistake_type,
                 "difficulty": attempt.difficulty,
@@ -54,9 +77,13 @@ async def store_memory_batch(payload: StoreMemoryBatchRequest):
 
 
 @router.post("/store-memory")
-async def store_quiz_memory(quiz_data: StoreMemoryRequest):
+async def store_quiz_memory(
+    quiz_data: StoreMemoryRequest,
+    current_user: TokenData = Depends(get_current_user),
+):
     """Store one quiz attempt for later insight generation."""
 
+    _validate_user_scope(quiz_data.user_id, current_user)
     success = await store_memory(quiz_data.model_dump())
 
     if success:
@@ -69,41 +96,43 @@ async def store_quiz_memory(quiz_data: StoreMemoryRequest):
 
 
 @router.get("/weak-topics/{user_id}")
-async def get_weak_topics(user_id: str):
+async def get_weak_topics(
+    user_id: str,
+    current_user: TokenData = Depends(get_current_user),
+):
     """Return unique topics where the user has weak quiz performance."""
 
-    if not user_id or not user_id.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="user_id cannot be empty",
-        )
+    clean_user_id = _validate_user_scope(user_id, current_user)
 
-    memories = await get_memories(user_id)
+    memories = await get_memories(clean_user_id)
     if not memories:
         return {
-            "user_id": user_id,
+            "user_id": clean_user_id,
             "weak_topics": [],
             "message": "No quiz records found for this user",
         }
 
     weak_topics = filter_weak_topics(memories)
-    return {"user_id": user_id, "weak_topics": weak_topics, "count": len(weak_topics)}
+    return {
+        "user_id": clean_user_id,
+        "weak_topics": weak_topics,
+        "count": len(weak_topics),
+    }
 
 
 @router.get("/mistakes/{user_id}")
-async def get_past_mistakes(user_id: str):
+async def get_past_mistakes(
+    user_id: str,
+    current_user: TokenData = Depends(get_current_user),
+):
     """Return detailed list of past mistakes for a user."""
 
-    if not user_id or not user_id.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="user_id cannot be empty",
-        )
+    clean_user_id = _validate_user_scope(user_id, current_user)
 
-    memories = await get_memories(user_id)
+    memories = await get_memories(clean_user_id)
     if not memories:
         return {
-            "user_id": user_id,
+            "user_id": clean_user_id,
             "mistakes": [],
             "message": "No quiz records found for this user",
         }
@@ -121,23 +150,26 @@ async def get_past_mistakes(user_id: str):
                 }
             )
 
-    return {"user_id": user_id, "mistakes": mistakes, "total_mistakes": len(mistakes)}
+    return {
+        "user_id": clean_user_id,
+        "mistakes": mistakes,
+        "total_mistakes": len(mistakes),
+    }
 
 
 @router.get("/insights/{user_id}")
-async def get_learning_insights(user_id: str):
+async def get_learning_insights(
+    user_id: str,
+    current_user: TokenData = Depends(get_current_user),
+):
     """Return aggregate learning insights computed from memory history."""
 
-    if not user_id or not user_id.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="user_id cannot be empty",
-        )
+    clean_user_id = _validate_user_scope(user_id, current_user)
 
-    memories = await get_memories(user_id)
+    memories = await get_memories(clean_user_id)
     if not memories:
         return {
-            "user_id": user_id,
+            "user_id": clean_user_id,
             "insights": {
                 "weak_topics": [],
                 "strong_topics": [],
@@ -147,30 +179,33 @@ async def get_learning_insights(user_id: str):
         }
 
     insights = calculate_insights(memories)
-    return {"user_id": user_id, "insights": insights, "total_records": len(memories)}
+    return {
+        "user_id": clean_user_id,
+        "insights": insights,
+        "total_records": len(memories),
+    }
 
 
 @router.get("/recommendations/{user_id}")
-async def get_topic_recommendations(user_id: str):
+async def get_topic_recommendations(
+    user_id: str,
+    current_user: TokenData = Depends(get_current_user),
+):
     """Return prioritized next topics and actions based on learning memory."""
 
-    if not user_id or not user_id.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="user_id cannot be empty",
-        )
+    clean_user_id = _validate_user_scope(user_id, current_user)
 
-    memories = await get_memories(user_id)
+    memories = await get_memories(clean_user_id)
     if not memories:
         return {
-            "user_id": user_id,
+            "user_id": clean_user_id,
             "recommendations": [],
             "message": "No quiz records found for this user",
         }
 
     recommendations = recommend_topics(memories)
     return {
-        "user_id": user_id,
+        "user_id": clean_user_id,
         "recommendations": recommendations,
         "total_records": len(memories),
     }

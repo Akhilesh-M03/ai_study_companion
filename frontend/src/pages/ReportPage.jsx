@@ -14,8 +14,14 @@ import {
 
 const ReportPage = () => {
   const navigate = useNavigate();
-  const { quizHistory, strongTopics, topicPerformance, weakTopics } =
-    useAppState();
+  const {
+    quizHistory,
+    serverMistakes,
+    serverMostCommonMistakeType,
+    serverRecommendations,
+    strongTopics,
+    weakTopics,
+  } = useAppState();
 
   const trend = useMemo(() => {
     const recent = quizHistory.slice(0, 3);
@@ -31,13 +37,22 @@ const ReportPage = () => {
     return Math.round(recentAvg - previousAvg);
   }, [quizHistory]);
 
-  const scoreSeries = quizHistory
-    .slice(0, 10)
-    .map((item, index) => ({
-      label: item.source || `Attempt ${index + 1}`,
-      score: item.score,
-    }))
-    .reverse();
+  const scoreSeries =
+    serverMistakes.length > 0
+      ? [...serverMistakes]
+          .slice(0, 10)
+          .map((item, index) => ({
+            label: item.topic || `Mistake ${index + 1}`,
+            score: item.score ?? 0,
+          }))
+          .reverse()
+      : quizHistory
+          .slice(0, 10)
+          .map((item, index) => ({
+            label: item.source || `Attempt ${index + 1}`,
+            score: item.score,
+          }))
+          .reverse();
 
   const cardClass =
     "bg-white border border-slate-200 shadow-sm rounded-2xl p-6";
@@ -126,9 +141,52 @@ const ReportPage = () => {
         </article>
       </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <article className={cardClass}>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Most Common Mistake Type
+          </p>
+          <p className="text-2xl font-bold mt-2 text-slate-900">
+            {serverMostCommonMistakeType || "No pattern yet"}
+          </p>
+          <p className="text-sm text-slate-500 mt-2">
+            Derived from synced memory records.
+          </p>
+        </article>
+
+        <article className={cardClass}>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Recommended Next Topics
+          </p>
+          <div className="mt-3 space-y-2 text-slate-800">
+            {serverRecommendations.slice(0, 3).map((item, index) => (
+              <div
+                key={`${item.topic}-${index}`}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+              >
+                <p className="text-sm font-semibold text-slate-900">
+                  {item.topic} ({item.recommended_difficulty})
+                </p>
+                <p className="text-xs text-slate-500 mt-1">{item.reason}</p>
+              </div>
+            ))}
+            {!serverRecommendations.length ? (
+              <p className="text-sm text-slate-500">
+                No recommendations yet. Complete a few more quizzes.
+              </p>
+            ) : null}
+          </div>
+        </article>
+      </div>
+
       <article className={cardClass}>
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
           Topic Trends
+        </p>
+        <p className="text-xs text-slate-500 mt-2">
+          {serverMistakes.length
+            ? "Showing backend memory mistakes trend"
+            : "Showing local recent attempt trend"}
         </p>
         <div className="mt-4 h-72 rounded-xl border border-slate-200 bg-slate-50 p-3">
           <ResponsiveContainer width="100%" height="100%">

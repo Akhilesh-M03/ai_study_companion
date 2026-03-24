@@ -21,7 +21,15 @@ import Flashcards from "./pages/Flashcards";
 import LandingPage from "./pages/LandingPage";
 
 const ProtectedRoutes = () => {
-  const { userName } = useAppState();
+  const { authReady, userName } = useAppState();
+
+  if (!authReady) {
+    return (
+      <div className="min-h-screen grid place-items-center text-slate-500 text-sm">
+        Loading your workspace...
+      </div>
+    );
+  }
 
   if (!userName) {
     return <Navigate to="/" replace />;
@@ -31,7 +39,12 @@ const ProtectedRoutes = () => {
 };
 
 const LoginRoute = () => {
-  const { userName } = useAppState();
+  const { authReady, userName } = useAppState();
+
+  if (!authReady) {
+    return null;
+  }
+
   if (userName) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -39,7 +52,12 @@ const LoginRoute = () => {
 };
 
 const RegisterRoute = () => {
-  const { userName } = useAppState();
+  const { authReady, userName } = useAppState();
+
+  if (!authReady) {
+    return null;
+  }
+
   if (userName) {
     return <Navigate to="/dashboard" replace />;
   }

@@ -54,11 +54,20 @@ const weakTopicFlashcardTemplates = {
   },
 };
 
-const buildFlashcards = (weakTopics) => {
+const buildFlashcards = (weakTopics, serverRecommendations) => {
+  const recommendedTopics = [
+    ...new Set(
+      (serverRecommendations || []).map((item) => item.topic).filter(Boolean),
+    ),
+  ];
   const weakTopicNames = [...new Set(weakTopics.map((item) => item.topic))];
   const mergedTopics = [
+    ...recommendedTopics,
     ...weakTopicNames,
-    ...fallbackWeakTopics.filter((topic) => !weakTopicNames.includes(topic)),
+    ...fallbackWeakTopics.filter(
+      (topic) =>
+        !weakTopicNames.includes(topic) && !recommendedTopics.includes(topic),
+    ),
   ].slice(0, 5);
 
   return mergedTopics.map((topic, index) => {
@@ -79,9 +88,12 @@ const buildFlashcards = (weakTopics) => {
 
 const Flashcards = () => {
   const navigate = useNavigate();
-  const { weakTopics } = useAppState();
+  const { serverRecommendations, weakTopics } = useAppState();
 
-  const cards = useMemo(() => buildFlashcards(weakTopics), [weakTopics]);
+  const cards = useMemo(
+    () => buildFlashcards(weakTopics, serverRecommendations),
+    [serverRecommendations, weakTopics],
+  );
 
   const [index, setIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);

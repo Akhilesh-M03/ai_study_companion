@@ -9,9 +9,17 @@ from app.api.deps import get_current_user
 from app.core.config import ACCESS_TOKEN_EXPIRE_MINUTES
 from app.core.database import get_db
 from app.core.security import create_access_token
-from app.schemas.auth import LoginRequest, Token, TokenData, UserCreate
+from app.schemas.auth import (
+    LoginRequest,
+    Token,
+    TokenData,
+    UpdateProfileRequest,
+    UserCreate,
+    UserResponse,
+)
 from app.services.user_service import (
     create_user,
+    ensure_user_student_id,
     get_user_by_username,
     get_user_by_email,
     verify_user_password,
@@ -121,7 +129,7 @@ async def protected_route(
     }
 
 
-@router.get("/user/profile")
+@router.get("/user/profile", response_model=UserResponse)
 async def get_user_profile(
     current_user: TokenData = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -134,9 +142,71 @@ async def get_user_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
+    user = ensure_user_student_id(db, user)
     return {
         "username": user.username,
         "full_name": user.full_name,
         "email": user.email,
-        "disabled": user.disabled,
+        "student_id": user.student_id,
+        "daily_study_hours": user.daily_study_hours,
+        "dsa_problems_per_day": user.dsa_problems_per_day,
+        "revision_minutes_per_day": user.revision_minutes_per_day,
+        "weekly_streak": user.weekly_streak,
+        "quizzes_completed": user.quizzes_completed,
+    }
+
+
+@router.put("/user/profile", response_model=UserResponse)
+async def update_user_profile(
+    profile_data: UpdateProfileRequest,
+    current_user: TokenData = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update user profile information."""
+
+    user = get_user_by_username(db, current_user.username)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    user = ensure_user_student_id(db, user)
+
+    # Update email if provided and validate uniqueness
+    if profile_data.email is not None:
+        if profile_data.email != user.email:
+            if get_user_by_email(db, profile_data.email):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email already in use",
+                )
+        user.email = profile_data.email
+
+    # Update other profile fields if provided
+    if profile_data.full_name is not None:
+        user.full_name = profile_data.full_name
+    if profile_data.daily_study_hours is not None:
+        user.daily_study_hours = profile_data.daily_study_hours
+    if profile_data.dsa_problems_per_day is not None:
+        user.dsa_problems_per_day = profile_data.dsa_problems_per_day
+    if profile_data.revision_minutes_per_day is not None:
+        user.revision_minutes_per_day = profile_data.revision_minutes_per_day
+    if profile_data.weekly_streak is not None:
+        user.weekly_streak = profile_data.weekly_streak
+    if profile_data.quizzes_completed is not None:
+        user.quizzes_completed = profile_data.quizzes_completed
+
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "username": user.username,
+        "full_name": user.full_name,
+        "email": user.email,
+        "student_id": user.student_id,
+        "daily_study_hours": user.daily_study_hours,
+        "dsa_problems_per_day": user.dsa_problems_per_day,
+        "revision_minutes_per_day": user.revision_minutes_per_day,
+        "weekly_streak": user.weekly_streak,
+        "quizzes_completed": user.quizzes_completed,
     }

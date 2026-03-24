@@ -6,21 +6,21 @@ import aiVisual from "../assets/image (7).png";
 
 const Register = () => {
   const navigate = useNavigate();
-  const { startSession } = useAppState();
+  const { registerAndLogin } = useAppState();
   const formRef = useRef(null);
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleRegister = (event) => {
+  const handleRegister = async (event) => {
     event.preventDefault();
 
     if (
-      !firstName.trim() ||
-      !lastName.trim() ||
+      !username.trim() ||
       !email.trim() ||
       !password.trim() ||
       !confirmPassword.trim()
@@ -29,12 +29,25 @@ const Register = () => {
     }
 
     if (password !== confirmPassword) {
+      setErrorMessage("Passwords do not match.");
       return;
     }
 
-    const fullName = `${firstName.trim()} ${lastName.trim()}`;
-    startSession(fullName, { showOnboarding: true });
-    navigate("/dashboard");
+    setIsSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      await registerAndLogin({ username, email, password });
+      navigate("/dashboard");
+    } catch (error) {
+      const message =
+        typeof error?.message === "string"
+          ? error.message
+          : "Unable to create your account right now.";
+      setErrorMessage(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleEnterSubmit = (event) => {
@@ -67,31 +80,17 @@ const Register = () => {
             onSubmit={handleRegister}
             className="mt-4 space-y-3 text-left"
           >
-            <div className="grid grid-cols-2 gap-3">
-              <div className="relative">
-                <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-200" />
-                <input
-                  type="text"
-                  value={firstName}
-                  onChange={(event) => setFirstName(event.target.value)}
-                  onKeyDown={handleEnterSubmit}
-                  placeholder="First Name"
-                  className="w-full rounded-xl border border-white/20 bg-white/5 py-3 pl-10 pr-4 text-sm text-white outline-none transition-all focus:border-emerald-300 focus:ring-2 focus:ring-emerald-200/60"
-                  required
-                />
-              </div>
-              <div className="relative">
-                <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-200" />
-                <input
-                  type="text"
-                  value={lastName}
-                  onChange={(event) => setLastName(event.target.value)}
-                  onKeyDown={handleEnterSubmit}
-                  placeholder="Last Name"
-                  className="w-full rounded-xl border border-white/20 bg-white/5 py-3 pl-10 pr-4 text-sm text-white outline-none transition-all focus:border-emerald-300 focus:ring-2 focus:ring-emerald-200/60"
-                  required
-                />
-              </div>
+            <div className="relative">
+              <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-indigo-200" />
+              <input
+                type="text"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                onKeyDown={handleEnterSubmit}
+                placeholder="Username"
+                className="w-full rounded-xl border border-white/20 bg-white/5 py-3 pl-10 pr-4 text-sm text-white outline-none transition-all focus:border-emerald-300 focus:ring-2 focus:ring-emerald-200/60"
+                required
+              />
             </div>
 
             <div className="relative">
@@ -135,11 +134,18 @@ const Register = () => {
 
             <button
               type="submit"
+              disabled={isSubmitting}
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3.5 text-sm font-black text-white shadow-[var(--cta-glow)] transition-colors duration-200 hover:bg-emerald-600"
             >
-              Generate My AI Tutor
+              {isSubmitting ? "Creating Account..." : "Generate My AI Tutor"}
               <ArrowRight className="h-4 w-4" />
             </button>
+
+            {errorMessage ? (
+              <p className="text-xs font-semibold text-rose-200 text-center">
+                {errorMessage}
+              </p>
+            ) : null}
           </form>
 
           <p className="text-sm text-indigo-100/80 text-center">

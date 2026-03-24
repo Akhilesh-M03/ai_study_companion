@@ -26,3 +26,12 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://user:password@localhost:5432/ai_study_companion",
 )
+
+
+def _parse_cors_origins(raw_value: str) -> list[str]:
+    return [item.strip() for item in raw_value.split(",") if item.strip()]
+
+
+ALLOWED_CORS_ORIGINS = _parse_cors_origins(
+    os.getenv("ALLOWED_CORS_ORIGINS", "http://localhost:5173")
+)
