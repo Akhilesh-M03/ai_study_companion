@@ -19,6 +19,7 @@ import Profile from "./pages/Profile";
 import ReportPage from "./pages/ReportPage";
 import Flashcards from "./pages/Flashcards";
 import LandingPage from "./pages/LandingPage";
+import WorkspaceLoading from "./components/WorkspaceLoading";
 
 const ProtectedRoutes = () => {
   const { userName } = useAppState();
@@ -58,6 +59,8 @@ function App() {
             <Route path="/register" element={<RegisterRoute />} />
 
             <Route element={<ProtectedRoutes />}>
+              <Route path="/workspace-loading" element={<WorkspaceLoading />} />
+
               <Route element={<Layout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/quiz" element={<Quiz />} />

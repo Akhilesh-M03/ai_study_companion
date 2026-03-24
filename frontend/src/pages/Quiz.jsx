@@ -423,13 +423,6 @@ const Quiz = () => {
                   <Lightbulb className="w-4 h-4 inline-block mr-2" />
                   {showHint ? "Hide Hint" : "Show Hint"}
                 </button>
-                <button
-                  onClick={() => startQuiz(true)}
-                  className="rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 px-5 py-3 font-semibold hover:bg-white transition-colors flex items-center gap-2"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  Auto-generate weak topics
-                </button>
               </>
             ) : (
               <>
