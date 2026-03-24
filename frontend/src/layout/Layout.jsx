@@ -1,5 +1,5 @@
 import React from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import OnboardingModal from "../components/OnboardingModal";
 import { useAppState } from "../context/AppStateContext";
@@ -17,10 +17,16 @@ const pageLabelMap = {
 const Layout = () => {
   const { completeOnboarding, isOnboardingOpen } = useAppState();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const segment =
     location.pathname.split("/").filter(Boolean)[0] || "dashboard";
   const currentPageLabel = pageLabelMap[segment] || "Dashboard";
+
+  const handleOnboardingComplete = (payload) => {
+    completeOnboarding(payload);
+    navigate("/workspace-loading", { replace: true });
+  };
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-800 font-sans antialiased">
@@ -28,7 +34,7 @@ const Layout = () => {
 
       <OnboardingModal
         isOpen={isOnboardingOpen}
-        onComplete={completeOnboarding}
+        onComplete={handleOnboardingComplete}
       />
 
       <div className="flex-1 ml-16 min-h-screen flex flex-col">

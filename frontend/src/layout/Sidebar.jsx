@@ -26,7 +26,7 @@ const iconBoxClass =
   "flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0";
 
 const Sidebar = () => {
-  const { logout, userName } = useAppState();
+  const { logout, userName, userEmail } = useAppState();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -108,7 +108,9 @@ const Sidebar = () => {
                 <p className="font-semibold text-slate-800 text-sm truncate">
                   {userName || "Learner"}
                 </p>
-                <p className="text-[11px] text-slate-500">Learner Mode</p>
+                <p className="text-[11px] text-slate-500 truncate">
+                  {userEmail}
+                </p>
               </div>
             </>
           )}
