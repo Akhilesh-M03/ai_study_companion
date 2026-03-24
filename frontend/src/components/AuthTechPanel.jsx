@@ -142,7 +142,7 @@ const AuthTechPanel = () => {
           {orbitNodes.map(
             ({
               id,
-              Icon,
+              Icon, // eslint-disable-line no-unused-vars
               label,
               duration,
               delay,

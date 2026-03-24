@@ -14,12 +14,12 @@ import {
 import { useAppState } from "../context/AppStateContext";
 
 const navItems = [
-  { to: "/dashboard", label: "Dashboard", Icon: LayoutDashboard },
-  { to: "/quiz", label: "Quiz", Icon: CircleHelp },
-  { to: "/exam", label: "Exam Mode", Icon: BadgeCheck },
-  { to: "/chat", label: "AI Chat", Icon: MessageSquareText },
-  { to: "/report", label: "Report", Icon: FileBarChart2 },
-  { to: "/flashcards", label: "Flashcards", Icon: Layers },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/quiz", label: "Quiz", icon: CircleHelp },
+  { to: "/exam", label: "Exam Mode", icon: BadgeCheck },
+  { to: "/chat", label: "AI Chat", icon: MessageSquareText },
+  { to: "/report", label: "Report", icon: FileBarChart2 },
+  { to: "/flashcards", label: "Flashcards", icon: Layers },
 ];
 
 const iconBoxClass =
@@ -50,36 +50,40 @@ const Sidebar = () => {
       </div>
 
       <nav className="flex-1 py-6 px-0 space-y-1 overflow-y-auto overflow-x-hidden">
-        {navItems.map(({ to, label, Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              `flex items-center w-full px-3 py-2 rounded-xl transition-colors duration-200 ${
-                isActive
-                  ? "text-emerald-700"
-                  : "text-slate-600 hover:text-slate-900"
-              }`
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <div
-                  className={`${iconBoxClass} ${
-                    isActive
-                      ? "bg-emerald-50 border border-emerald-100"
-                      : "bg-transparent border border-transparent group-hover/sidebar:bg-slate-50"
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                </div>
-                <span className="hidden md:block font-semibold text-sm ml-3 whitespace-nowrap max-w-0 opacity-0 overflow-hidden group-hover/sidebar:max-w-35 group-hover/sidebar:opacity-100 transition-all duration-300">
-                  {label}
-                </span>
-              </>
-            )}
-          </NavLink>
-        ))}
+        {navItems.map(
+          (
+            { to, label, icon: Icon }, // eslint-disable-line no-unused-vars
+          ) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                `flex items-center w-full px-3 py-2 rounded-xl transition-colors duration-200 ${
+                  isActive
+                    ? "text-emerald-700"
+                    : "text-slate-600 hover:text-slate-900"
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <div
+                    className={`${iconBoxClass} ${
+                      isActive
+                        ? "bg-emerald-50 border border-emerald-100"
+                        : "bg-transparent border border-transparent group-hover/sidebar:bg-slate-50"
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <span className="hidden md:block font-semibold text-sm ml-3 whitespace-nowrap max-w-0 opacity-0 overflow-hidden group-hover/sidebar:max-w-35 group-hover/sidebar:opacity-100 transition-all duration-300">
+                    {label}
+                  </span>
+                </>
+              )}
+            </NavLink>
+          ),
+        )}
       </nav>
 
       <div className="mt-auto px-0 py-3 border-t border-slate-200 shrink-0 space-y-1">

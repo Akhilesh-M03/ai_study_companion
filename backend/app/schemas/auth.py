@@ -39,6 +39,7 @@ class UserResponse(BaseModel):
     username: str
     email: str
     full_name: Optional[str] = None
+    disabled: bool = False
     student_id: Optional[str] = None
     daily_study_hours: int = 1
     dsa_problems_per_day: int = 5
